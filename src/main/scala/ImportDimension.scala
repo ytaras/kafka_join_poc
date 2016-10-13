@@ -9,13 +9,16 @@ import scala.collection.JavaConversions._
 /**
   * Created by ytaras on 10/13/16.
   */
-object ImportDimension extends App with AvroUtils {
+object ImportDimension extends AvroUtils {
+  def run(input: String) = {
+    val topic = "dimension"
+    println(s"Sending to topic $topic")
+    val stream = readAvroDir(input)
+      .map(record => (record.get("join_key").toString, record))
+      .map{ case (k, v) => new ProducerRecord(topic, k, v) }
+    sendToProducer(Producer.dimension, stream)
+  }
 
-  val dimensionAvro = "/Users/ytaras/Projects/other/kafka_join/avro_output/dimension"
-  val stream = readAvroDir(dimensionAvro)
-    .map(record => (record.get("join_key").toString, record))
-    .map{ case (k, v) => new ProducerRecord("mock_dim", k, v) }
-  sendToProducer(Producer.dimension, stream)
 }
 
 trait AvroUtils {
@@ -29,9 +32,15 @@ trait AvroUtils {
       .openReader(f, new GenericDatumReader[GenericRecord])
   }
 
+  // TODO - Use some parallelism. For now it's too slow
   def sendToProducer[K, V](producer: KafkaProducer[K, V], s: Stream[ProducerRecord[K, V]]) = try {
-    s.foreach(producer.send)
+    var acc: Long = 0
+    s.foreach { r =>
+      acc += 1
+      producer.send(r)
+    }
     producer.flush()
+    println(s"Sent $acc records")
   } finally {
     producer.close()
   }

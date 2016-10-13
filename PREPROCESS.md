@@ -74,3 +74,15 @@ spark.read.avro(s"$outputDir/fact/").show
 spark.read.avro(s"$outputDir/dimension/").show
 ```
 Last two lines take sample of files stored
+
+### Save canonical join result
+
+We have to join datasets with spark to have something to compare alternative implementations to
+
+```
+val dimension = spark.read.avro(s"$outputDir/dimension/")
+val fact = spark.read.avro(s"$outputDir/fact/")
+fact.withColumnRenamed("ip", "fact_ip").join(dimension, usingColumn = "join_key").orderBy("_id").coalesce(1).write.option("header", true).csv(s"$outputDir/joinedCsv")
+```
+
+You can have one more coffee now. After a while you'll get 1.6Gb big file which you can compare to other results.
