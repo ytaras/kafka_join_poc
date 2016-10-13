@@ -15,15 +15,15 @@ object Main extends App {
       """.stripMargin)
   }
 
-  if (doFact) {
-    val input = s"$dir/fact"
-    println(s"Importing facts in directory $input")
-    ImportFacts.run(input)
+  if (doDim) {
+      val input = s"$dir/dimension"
+      println(s"Importing dimension in directory $input")
+      ImportDimension.run(input)
   }
 
-  if (doDim) {
-    val input = s"$dir/dimension"
-    println(s"Importing dimension in directory $input")
-    ImportDimension.run(input)
+  if (doFact) {
+      val input = s"$dir/fact"
+      println(s"Importing facts in directory $input")
+      ImportFacts.run(input)
   }
 }
