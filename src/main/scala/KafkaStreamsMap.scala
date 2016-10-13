@@ -2,7 +2,7 @@ import java.util.{UUID, Properties}
 
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
 import io.confluent.kafka.serializers.{KafkaAvroDeserializer, KafkaAvroSerializer}
-import org.apache.avro.Schema
+import org.apache.avro.{SchemaBuilder, Schema}
 import org.apache.avro.generic.{GenericData, GenericRecord}
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.Serdes
@@ -39,17 +39,20 @@ object KafkaStreamsMap extends App {
 
     // TODO - Figure out why I have to specify this by hand
     val client = new CachedSchemaRegistryClient("http://localhost:18081", 20)
-    /*
     val mergedSchema = {
       val factSchema = Schema.parse(client.getLatestSchemaMetadata("dimension_part_8-value").getSchema)
+      println(factSchema.getName)
       val dimSchema = Schema.parse(client.getLatestSchemaMetadata("facts_part_8-value").getSchema)
-      val list = List(
-        new Schema.Field("fact", factSchema, "", null),
-        new Schema.Field("dim", dimSchema, "", null)
-      )
-      Schema.createRecord(list)
+
+      val fsRenamed = Schema.createRecord("fact", factSchema.getDoc, factSchema.getNamespace, factSchema.isError, factSchema.getFields)
+      val dsRenamed = Schema.createRecord("dim", dimSchema.getDoc, dimSchema.getNamespace, factSchema.isError, factSchema.getFields)
+      SchemaBuilder.record("tuple")
+        .fields()
+        .name("fact").`type`(fsRenamed).noDefault()
+        .name("dim").`type`(dsRenamed).noDefault()
+        .endRecord
     }
-    */
+    println(mergedSchema)
     val dimension: KTable[String, GenericRecord] = builder.table(Serdes.String(), GenericAvroSerde.generic(client), "dimension_part_8")
     val facts: KStream[String, GenericRecord] = builder
       .stream(Serdes.String(), GenericAvroSerde.generic(client), "facts_part_8")
