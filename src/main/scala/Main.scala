@@ -9,8 +9,9 @@ object Main extends App {
     case Array(d, x) if x == "fact" => (d, true, false)
     case _ =>
       sys.error(
-      """
+      s"""
         |Expected format: avro_dir [fact|dim|all]
+        |Received: ${args.toList}
       """.stripMargin)
   }
 

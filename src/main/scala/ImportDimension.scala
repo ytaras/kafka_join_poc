@@ -11,7 +11,7 @@ import scala.collection.JavaConversions._
   */
 object ImportDimension extends AvroUtils {
   def run(input: String) = {
-    val topic = "dimension"
+    val topic = "dimension_part_8"
     println(s"Sending to topic $topic")
     val stream = readAvroDir(input)
       .map(record => (record.get("join_key").toString, record))
@@ -25,7 +25,7 @@ trait AvroUtils {
 
   def readAvroDir(str: String) =
     new File(str).listFiles.filter(_.getName.endsWith(".avro"))
-    .toStream
+    .iterator
     .flatMap(readAvro)
   def readAvro(f: File): Iterator[GenericRecord] = {
     DataFileReader
@@ -33,14 +33,16 @@ trait AvroUtils {
   }
 
   // TODO - Use some parallelism. For now it's too slow
-  def sendToProducer[K, V](producer: KafkaProducer[K, V], s: Stream[ProducerRecord[K, V]]) = try {
+  def sendToProducer[K, V](producer: KafkaProducer[K, V], s: Iterator[ProducerRecord[K, V]]) = try {
     var acc: Long = 0
-    s.foreach { r =>
-      acc += 1
-      producer.send(r)
+    s.grouped(1000).foreach { records =>
+      records.foreach { r =>
+        acc += 1
+        producer.send(r)
+      }
+      producer.flush()
+      println(s"Sent $acc records")
     }
-    producer.flush()
-    println(s"Sent $acc records")
   } finally {
     producer.close()
   }

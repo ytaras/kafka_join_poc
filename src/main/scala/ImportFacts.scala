@@ -5,7 +5,7 @@ import org.apache.kafka.clients.producer.ProducerRecord
   */
 object ImportFacts extends AvroUtils {
   def run(input: String) = {
-    val topic = "facts"
+    val topic = "facts_part_8"
     println(s"Sending to topic $topic")
     val stream = readAvroDir(input).map { record =>
       new ProducerRecord(topic, record)
