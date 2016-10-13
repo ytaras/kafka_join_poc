@@ -35,7 +35,7 @@ I already calculated that for you, so you may skip last line:
 |m_time|357888|
 |device|501|
 
-We would like to try to join big facts dataset (12002481 input rows) with some \
+We would like to try to join big facts dataset (12002481 input rows) with some 
 dimension dataset, which have ~1M records. We don't have appropriate colunms
 in our dataset, but we can easily get artificial join key by trimming 
 _id column last character:
