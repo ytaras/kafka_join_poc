@@ -39,28 +39,31 @@ object KafkaStreamsMap extends App {
 
     // TODO - Figure out why I have to specify this by hand
     val client = new CachedSchemaRegistryClient("http://localhost:18081", 20)
+    /*
+    val mergedSchema = {
+      val factSchema = Schema.parse(client.getLatestSchemaMetadata("dimension_part_8-value").getSchema)
+      val dimSchema = Schema.parse(client.getLatestSchemaMetadata("facts_part_8-value").getSchema)
+      val list = List(
+        new Schema.Field("fact", factSchema, "", null),
+        new Schema.Field("dim", dimSchema, "", null)
+      )
+      Schema.createRecord(list)
+    }
+    */
     val dimension: KTable[String, GenericRecord] = builder.table(Serdes.String(), GenericAvroSerde.generic(client), "dimension_part_8")
     val facts: KStream[String, GenericRecord] = builder
       .stream(Serdes.String(), GenericAvroSerde.generic(client), "facts_part_8")
       .map((_, v) => new KeyValue(v.get("join_key").toString, v))
-      .through(Serdes.String(), GenericAvroSerde.generic(client), "internal-rekey")
+      .through(Serdes.String(), GenericAvroSerde.generic(client), "facts_keyed_by_join_key_part_8")
 
-    val joiner: ValueJoiner[GenericRecord, GenericRecord, GenericRecord] = { (v1, v2) =>
-      // TODO - Impelement schema caching
-      val list = List(
-        new Schema.Field("left", v1.getSchema, "", null),
-        new Schema.Field("right", v2.getSchema, "", null)
-      )
-      val schema = Schema.createRecord(list)
-      val res = new GenericData.Record(schema)
-      res.put("left", v1)
-      res.put("right", v2)
-      res
+    val joiner: ValueJoiner[GenericRecord, GenericRecord, String] = { (v1, v2) =>
+      // TODO - Impelement AVRO serialization
+      //
+      s"""{ fact: $v1, dim: $v2 }"""
     }
     //val joined: KStream[String, GenericRecord] =
     facts.leftJoin(dimension, joiner)
-      .foreach((x, y) => println(s"$x -> $y"))
-
+      .to(Serdes.String(), Serdes.String(), "merged_facts_and_dimensions")
 
     new KafkaStreams(builder, streamingConfig).start()
   }
