@@ -1,6 +1,6 @@
 ## Preprocess dataset
 We assume you have Spark 2.x installed. 
-Just run SPARK_HOME/bin/spark-shell and point your browser to http://localhost:4040 to monitor.
+Just run `SPARK_HOME/bin/spark-shell --driver-memory 4g` and point your browser to http://localhost:4040 to monitor.
 
 ### Load file
 ```
