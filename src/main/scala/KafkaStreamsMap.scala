@@ -77,11 +77,6 @@ object KafkaStreamsMap extends App {
     facts.leftJoin(dimension, joiner)
       .to(Serdes.String(), GenericAvroSerde.generic(client), "merged_facts_and_dimensions")
     val streams = new KafkaStreams(builder, streamingConfig)
-    facts.foreach { (_, _) =>
-      if(counter.incrementAndGet() > max) {
-        streams.close()
-      }
-    }
 
     streams.start()
   }
