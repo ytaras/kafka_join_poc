@@ -54,9 +54,9 @@ dataset, where 'join_key' will be unique value for dimension:
 
 ```
 val facts = inputWithJoinKey.select($"_id", $"ip", $"m_label", $"m_max", $"m_val", from_unixtime($"m_time").as("m_time"), $"join_key")
-val dimension = inputWithJoinKey.select("join_key", "d_desc", "ip", "optx_hostname")
+val dimension = inputWithJoinKey.select("join_key", "d_desc", "optx_hostname", "device")
     .dropDuplicates("join_key")
-    .orderBy("ip") // just to have different ordering than facts so we have more fair test
+    .orderBy("device") // just to have different ordering than facts so we have more fair test
     .coalesce(16) // In previous stages we had 200 partitions which would result in 200 files on disc, which is not nice
 ```
 You can have a look at datasets with `facts.show` and `dimension.show`
@@ -82,7 +82,7 @@ We have to join datasets with spark to have something to compare alternative imp
 ```
 val dimension = spark.read.avro(s"$outputDir/dimension/")
 val fact = spark.read.avro(s"$outputDir/fact/")
-fact.withColumnRenamed("ip", "fact_ip").join(dimension, usingColumn = "join_key").orderBy("_id").coalesce(1).write.option("header", true).csv(s"$outputDir/joinedCsv")
+fact.join(dimension, usingColumn = "join_key").orderBy("_id").coalesce(1).write.option("header", true).csv(s"$outputDir/joinedCsv")
 ```
 
 You can have one more coffee now. After a while you'll get 1.6Gb big file which you can compare to other results.
