@@ -1,6 +1,5 @@
 import java.util.Properties
 
-import io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
 import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.clients.producer.KafkaProducer
 
@@ -15,7 +14,6 @@ object Producer {
 
  props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
  props.put("value.serializer", "io.confluent.kafka.serializers.KafkaAvroSerializer")
- props.put("interceptor.classes", classOf[MonitoringProducerInterceptor[_, _]].getCanonicalName)
 
  val dimension = new KafkaProducer[String, GenericRecord](props)
  val fact = new KafkaProducer[Nothing, GenericRecord](props)

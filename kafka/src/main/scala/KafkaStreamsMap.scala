@@ -2,15 +2,13 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.{Properties, UUID}
 
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
-import io.confluent.monitoring.clients.interceptor.{MonitoringConsumerInterceptor, MonitoringProducerInterceptor}
-import org.apache.avro.{Schema, SchemaBuilder}
+import org.apache.avro.Schema
 import org.apache.avro.generic.GenericData.Record
 import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.Serdes
 import org.apache.kafka.streams.kstream._
 import org.apache.kafka.streams.{KafkaStreams, KeyValue, StreamsConfig}
-
 import scala.collection.JavaConversions._
 
 /**

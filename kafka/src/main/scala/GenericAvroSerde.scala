@@ -1,9 +1,7 @@
-import java.util
-
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.{KafkaAvroDeserializer, KafkaAvroSerializer}
 import org.apache.avro.generic.GenericRecord
-import org.apache.kafka.common.serialization.{Serdes, Deserializer, Serializer, Serde}
+import org.apache.kafka.common.serialization.{Serde, Serdes}
 
 /**
   * Created by ytaras on 10/13/16.

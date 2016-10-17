@@ -1,9 +1,9 @@
 import java.io.File
-import java.util.Properties
 
 import org.apache.avro.file.DataFileReader
-import org.apache.avro.generic.{GenericRecord, GenericDatumReader}
+import org.apache.avro.generic.{GenericDatumReader, GenericRecord}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
+
 import scala.collection.JavaConversions._
 
 /**
