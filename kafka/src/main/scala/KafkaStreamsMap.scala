@@ -15,9 +15,10 @@ import scala.collection.JavaConversions._
   * Created by ytaras on 10/13/16.
   */
 object KafkaStreamsMap extends App {
-  run
+  run(SampleJoinConfig)
 
-  def run = {
+  def run(config: JoinConfig) = {
+    val appStartTime = System.currentTimeMillis()
     val builder: KStreamBuilder = new KStreamBuilder
 
     val streamingConfig = {
@@ -28,54 +29,42 @@ object KafkaStreamsMap extends App {
       settings.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092")
       settings.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, "localhost:2181")
       settings.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
-      settings.put("schema.registry.url", "http://localhost:8081")
+      settings.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, "6")
+      settings.put("schema.registry.url", "http://localhost:18081")
       // Specify default (de)serializers for record keys and for record values.
       settings
     }
 
-    val max = 10;
-    val counter = new AtomicLong
-
     // TODO - Figure out why I have to specify this by hand
-    val client = new CachedSchemaRegistryClient("http://localhost:8081", 20)
-    val mergedSchema = {
-      val factSchema = Schema.parse(client.getLatestSchemaMetadata("dimension_part_8-value").getSchema)
-      val dimSchema = Schema.parse(client.getLatestSchemaMetadata("facts_part_8-value").getSchema)
-      val fields = (factSchema.getFields ++ dimSchema.getFields).groupBy(_.name())
-        .map { case (_, v) => v.head }.zipWithIndex.map { case (i, f) =>
-        new Schema.Field(i.name(), i.schema, i.doc(), i.defaultVal())
-      }
-      Schema.createRecord("top", null, null, false, fields.toList)
-    }
-    println(mergedSchema)
-    val dimension: KTable[String, GenericRecord] = builder.table(Serdes.String(), GenericAvroSerde.generic(client), "dimension_part_8")
+    val client = new CachedSchemaRegistryClient("http://localhost:18081", 20)
+    println(config.mergedSchema)
+    val counter = new AtomicLong()
+    val dimension: KTable[String, GenericRecord] = builder.table(Serdes.String(), GenericAvroSerde.generic(client), config.dimensionStream)
     val facts: KStream[String, GenericRecord] = builder
-      .stream(Serdes.String(), GenericAvroSerde.generic(client), "facts_part_8")
-      .map((_, v) => new KeyValue(v.get("join_key").toString, v))
-      .through(Serdes.String(), GenericAvroSerde.generic(client), "facts_keyed_by_join_key_part_8")
+      .stream(Serdes.String(), GenericAvroSerde.generic(client), config.factStream)
+      .map((_, v) => new KeyValue(v.get(config.joinKey).toString, v))
+      .through(Serdes.String(), GenericAvroSerde.generic(client), s"${config.factStream}_key_by_${config.joinKey}")
 
-    val joiner: ValueJoiner[GenericRecord, GenericRecord, GenericRecord] = { (v1, v2) =>
-      // TODO - Impelement AVRO serialization
-      //
-      val res = new Record(mergedSchema)
-       v1.getSchema.getFields.forEach {
-         f => res.put(f.name(), v1.get(f.name()))
-       }
-      if(v2 != null) {
-        v2
-          .getSchema
-          .getFields
-          .forEach {
-            f => res.put(f.name(), v2.get(f.name()))
-          }
-      }
-      res
-    }
-    //val joined: KStream[String, GenericRecord] =
+    val joiner: ValueJoiner[GenericRecord, GenericRecord, GenericRecord] =
+      (value1: GenericRecord, value2: GenericRecord) => config.mergeRecords(value1, value2)
+    var startTime: Long = 0
+    var streams: KafkaStreams = null
     facts.leftJoin(dimension, joiner)
-      .to(Serdes.String(), GenericAvroSerde.generic(client), "merged_facts_and_dimensions")
-    val streams = new KafkaStreams(builder, streamingConfig)
-
+      .mapValues { x =>
+        val c = counter.incrementAndGet()
+        if(c == 1)
+          startTime = System.currentTimeMillis()
+        if(c % 1000 == 0) {
+          val current = System.currentTimeMillis()
+          val messagesPs = c.toDouble / (current - startTime) * 1000
+          val messagesPsOverhead = c.toDouble / (current - appStartTime) * 1000
+          println(s"Processed $c records")
+          println(f"M/ps $messagesPs%2.2f, with app start overhead - $messagesPsOverhead%2.2f")
+        }
+        x
+      }
+      .to(Serdes.String(), GenericAvroSerde.generic(client), config.outputTo)
+    streams = new KafkaStreams(builder, streamingConfig)
     streams.start()
   }
 
