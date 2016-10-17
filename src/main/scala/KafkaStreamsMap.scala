@@ -1,24 +1,23 @@
-import java.util.{UUID, Properties}
+import java.util.concurrent.atomic.AtomicLong
+import java.util.{Properties, UUID}
 
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
-import io.confluent.kafka.serializers.{KafkaAvroDeserializer, KafkaAvroSerializer}
-import org.apache.avro.{SchemaBuilder, Schema}
-import org.apache.avro.generic.{GenericData, GenericRecord}
+import io.confluent.monitoring.clients.interceptor.{MonitoringConsumerInterceptor, MonitoringProducerInterceptor}
+import org.apache.avro.{Schema, SchemaBuilder}
+import org.apache.avro.generic.GenericData.Record
+import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.Serdes
-import org.apache.kafka.common.serialization.Serdes.StringSerde
-import org.apache.kafka.streams.{KeyValue, KafkaStreams, StreamsConfig}
 import org.apache.kafka.streams.kstream._
-import org.apache.kafka.common.serialization._
-import org.apache.kafka.streams._
-import collection.JavaConversions._
+import org.apache.kafka.streams.{KafkaStreams, KeyValue, StreamsConfig}
+
+import scala.collection.JavaConversions._
 
 /**
   * Created by ytaras on 10/13/16.
   */
 object KafkaStreamsMap extends App {
   run
-  import KeyValueImplicits._
 
   def run = {
     val builder: KStreamBuilder = new KStreamBuilder
@@ -31,26 +30,24 @@ object KafkaStreamsMap extends App {
       settings.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092")
       settings.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, "localhost:2181")
       settings.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
-      settings.put("schema.registry.url", "http://localhost:18081")
+      settings.put("schema.registry.url", "http://localhost:8081")
       // Specify default (de)serializers for record keys and for record values.
       settings
     }
 
+    val max = 10;
+    val counter = new AtomicLong
 
     // TODO - Figure out why I have to specify this by hand
-    val client = new CachedSchemaRegistryClient("http://localhost:18081", 20)
+    val client = new CachedSchemaRegistryClient("http://localhost:8081", 20)
     val mergedSchema = {
       val factSchema = Schema.parse(client.getLatestSchemaMetadata("dimension_part_8-value").getSchema)
-      println(factSchema.getName)
       val dimSchema = Schema.parse(client.getLatestSchemaMetadata("facts_part_8-value").getSchema)
-
-      val fsRenamed = Schema.createRecord("fact", factSchema.getDoc, factSchema.getNamespace, factSchema.isError, factSchema.getFields)
-      val dsRenamed = Schema.createRecord("dim", dimSchema.getDoc, dimSchema.getNamespace, factSchema.isError, factSchema.getFields)
-      SchemaBuilder.record("tuple")
-        .fields()
-        .name("fact").`type`(fsRenamed).noDefault()
-        .name("dim").`type`(dsRenamed).noDefault()
-        .endRecord
+      val fields = (factSchema.getFields ++ dimSchema.getFields).groupBy(_.name())
+        .map { case (_, v) => v.head }.zipWithIndex.map { case (i, f) =>
+        new Schema.Field(i.name(), i.schema, i.doc(), i.defaultVal())
+      }
+      Schema.createRecord("top", null, null, false, fields.toList)
     }
     println(mergedSchema)
     val dimension: KTable[String, GenericRecord] = builder.table(Serdes.String(), GenericAvroSerde.generic(client), "dimension_part_8")
@@ -59,16 +56,29 @@ object KafkaStreamsMap extends App {
       .map((_, v) => new KeyValue(v.get("join_key").toString, v))
       .through(Serdes.String(), GenericAvroSerde.generic(client), "facts_keyed_by_join_key_part_8")
 
-    val joiner: ValueJoiner[GenericRecord, GenericRecord, String] = { (v1, v2) =>
+    val joiner: ValueJoiner[GenericRecord, GenericRecord, GenericRecord] = { (v1, v2) =>
       // TODO - Impelement AVRO serialization
       //
-      s"""{ fact: $v1, dim: $v2 }"""
+      val res = new Record(mergedSchema)
+       v1.getSchema.getFields.forEach {
+         f => res.put(f.name(), v1.get(f.name()))
+       }
+      if(v2 != null) {
+        v2
+          .getSchema
+          .getFields
+          .forEach {
+            f => res.put(f.name(), v2.get(f.name()))
+          }
+      }
+      res
     }
     //val joined: KStream[String, GenericRecord] =
     facts.leftJoin(dimension, joiner)
-      .to(Serdes.String(), Serdes.String(), "merged_facts_and_dimensions")
+      .to(Serdes.String(), GenericAvroSerde.generic(client), "merged_facts_and_dimensions")
+    val streams = new KafkaStreams(builder, streamingConfig)
 
-    new KafkaStreams(builder, streamingConfig).start()
+    streams.start()
   }
 
 }

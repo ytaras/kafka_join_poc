@@ -1,5 +1,6 @@
 import java.util.Properties
 
+import io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
 import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.clients.producer.KafkaProducer
 
@@ -10,10 +11,11 @@ object Producer {
  val props = new Properties()
  props.put("bootstrap.servers", "localhost:9092")
  props.put("acks", "all")
- props.put("schema.registry.url", "http://localhost:18081")
+ props.put("schema.registry.url", "http://localhost:8081")
 
  props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
  props.put("value.serializer", "io.confluent.kafka.serializers.KafkaAvroSerializer")
+ props.put("interceptor.classes", classOf[MonitoringProducerInterceptor[_, _]].getCanonicalName)
 
  val dimension = new KafkaProducer[String, GenericRecord](props)
  val fact = new KafkaProducer[Nothing, GenericRecord](props)
