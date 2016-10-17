@@ -21,14 +21,9 @@ object PublishData extends App {
     .master("local[*]")
     .getOrCreate()
   val sc = sql.sparkContext
-  println(sc.getConf.getLong("spark.streaming.kafka.consumer.poll.ms", 0L))
 
-  val dimension = loadAvroRDD(sc, new File(parentDir, "dimension").getAbsolutePath)
-  publishRDDToKafka("dim_part_8", dimension, Some("join_key"))
-
-  val facts = loadAvroRDD(sc, new File(parentDir, "fact").getAbsolutePath)
-  publishRDDToKafka("fact_part_8", dimension)
-
+  publishRDDToKafka("dim_part_8", loadAvroRDD(sc, new File(parentDir, "dimension").getAbsolutePath), Some("join_key"))
+  publishRDDToKafka("fact_part_8", loadAvroRDD(sc, new File(parentDir, "fact").getAbsolutePath))
 
   def loadAvroRDD(sc: SparkContext, path: String): RDD[GenericRecord] = {
     sc.hadoopFile(path,

@@ -1,6 +1,7 @@
 import org.apache.avro.generic.GenericRecord
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.streaming.kafka010.{ConsumerStrategies, LocationStrategies, KafkaUtils}
+import org.apache.spark.streaming.scheduler.{StreamingListenerBatchCompleted, StreamingListener}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 
 /**
@@ -20,8 +21,9 @@ object DumpKafkaTopic extends App {
     "schema.registry.url" -> "http://localhost:18081",
     "key.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
     "value.deserializer" -> "io.confluent.kafka.serializers.KafkaAvroDeserializer",
-    "group.id" -> "spark-dump-to-csv-1",
-    "auto.offset.reset" -> "earliest",
+    "group.id" -> "spark-dump-to-csv",
+    // "auto.offset.reset" -> "earliest",
+    "auto.offset.reset" -> "latest",
     "enable.auto.commit" -> (false: java.lang.Boolean)
   )
 
@@ -39,6 +41,13 @@ object DumpKafkaTopic extends App {
   factStream.foreachRDD { x => println(s"Fact size - ${x.count}") }
   factStream.saveAsTextFiles("/tmp/dump-topics/fact")
 
+  ssc.addStreamingListener(new StreamingListener {
+    override def onBatchCompleted(batchCompleted: StreamingListenerBatchCompleted) = {
+      println(s"Batch completed: ${batchCompleted.batchInfo}")
+      // FIXME - THis doesn't work as we have to do it in some other thread
+      ssc.stop(stopSparkContext = true, stopGracefully = true)
+    }
+  })
   ssc.start()
   ssc.awaitTermination()
 }
