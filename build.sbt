@@ -7,21 +7,29 @@ val commonSettings = Seq(
   scalacOptions += "-Xexperimental",
   resolvers ++= Seq(
     Resolver.sonatypeRepo("public"),
-    "confluent" at "http://packages.confluent.io/maven/")
+    "spark_packages" at "https://dl.bintray.com/spark-packages/maven/",
+    "confluent" at "http://packages.confluent.io/maven/"
+  )
 )
 
 lazy val core = project
   .settings(commonSettings: _*)
   .settings(
     libraryDependencies ++= Seq(
-      "org.apache.avro" % "avro" % "1.8.1",
-      "org.slf4j" % "slf4j-jdk14" % "1.7.21"
+      "org.apache.avro" % "avro" % "1.8.1"
     )
   )
 lazy val spark = project
   .dependsOn(core)
-  .enablePlugins(sbtsparkpackage.SparkPackagePlugin)
   .settings(commonSettings: _*)
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.apache.spark" %% "spark-core" % "2.0.1",
+      "org.apache.spark" %% "spark-sql" % "2.0.1",
+      "org.apache.spark" %% "spark-streaming" % "2.0.1",
+      "databricks" % "spark-avro" % "3.0.1-s_2.11"
+    )
+  )
 
 lazy val kafka = project
   .dependsOn(core)
