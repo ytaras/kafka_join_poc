@@ -82,7 +82,7 @@ We have to join datasets with spark to have something to compare alternative imp
 ```
 val dimension = spark.read.avro(s"$outputDir/dimension/")
 val fact = spark.read.avro(s"$outputDir/fact/")
-fact.join(dimension, usingColumn = "join_key").orderBy("_id").coalesce(1).write.option("header", true).csv(s"$outputDir/joinedCsv")
+fact.join(dimension, usingColumn = "join_key").orderBy("_id").coalesce(1).write.json(s"$outputDir/joinedJson")
 ```
 
 You can have one more coffee now. After a while you'll get 1.6Gb big file which you can compare to other results.

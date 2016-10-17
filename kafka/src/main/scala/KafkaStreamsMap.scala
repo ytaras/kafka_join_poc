@@ -48,23 +48,27 @@ object KafkaStreamsMap extends App {
     val joiner: ValueJoiner[GenericRecord, GenericRecord, GenericRecord] =
       (value1: GenericRecord, value2: GenericRecord) => config.mergeRecords(value1, value2)
     var startTime: Long = 0
-    var streams: KafkaStreams = null
+    var prevTime: Long = 0
     facts.leftJoin(dimension, joiner)
       .mapValues { x =>
         val c = counter.incrementAndGet()
-        if(c == 1)
+        if(c == 1) {
+          prevTime = System.currentTimeMillis()
           startTime = System.currentTimeMillis()
+        }
         if(c % 1000 == 0) {
           val current = System.currentTimeMillis()
-          val messagesPs = c.toDouble / (current - startTime) * 1000
+          val messagesPsAvg = c.toDouble / (current - startTime) * 1000
+          val messagesPsCur = 1000d / (current - prevTime) * 1000
           val messagesPsOverhead = c.toDouble / (current - appStartTime) * 1000
+          prevTime = current
           println(s"Processed $c records")
-          println(f"M/ps $messagesPs%2.2f, with app start overhead - $messagesPsOverhead%2.2f")
+          println(f"M/ps: $messagesPsCur%2.2f ($messagesPsAvg%2.2f avg), with app start overhead - $messagesPsOverhead%2.2f")
         }
         x
       }
       .to(Serdes.String(), GenericAvroSerde.generic(client), config.outputTo)
-    streams = new KafkaStreams(builder, streamingConfig)
+    val streams = new KafkaStreams(builder, streamingConfig)
     streams.start()
   }
 
