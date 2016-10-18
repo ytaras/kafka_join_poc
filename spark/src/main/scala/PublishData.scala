@@ -22,8 +22,9 @@ object PublishData extends App {
     .getOrCreate()
   val sc = sql.sparkContext
 
-  publishRDDToKafka("dim_part_8", loadAvroRDD(sc, new File(parentDir, "dimension").getAbsolutePath), Some("join_key"))
-  publishRDDToKafka("fact_part_8", loadAvroRDD(sc, new File(parentDir, "fact").getAbsolutePath))
+  publishRDDToKafka(SampleJoinConfig.dimensionStream, loadAvroRDD(sc, new File(parentDir, "dimension").getAbsolutePath),
+    Some(SampleJoinConfig.joinKey))
+  publishRDDToKafka(SampleJoinConfig.factStream, loadAvroRDD(sc, new File(parentDir, "fact").getAbsolutePath))
 
   def loadAvroRDD(sc: SparkContext, path: String): RDD[GenericRecord] = {
     sc.hadoopFile(path,

@@ -6,7 +6,10 @@ import org.apache.avro.Schema
 import org.apache.avro.generic.GenericData.Record
 import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.common.metrics.stats.{Rate, Total, Avg}
+import org.apache.kafka.common.metrics.{MetricConfig, Metrics, MetricsReporter, JmxReporter}
 import org.apache.kafka.common.serialization.Serdes
+import org.apache.kafka.common.utils.SystemTime
 import org.apache.kafka.streams.kstream._
 import org.apache.kafka.streams.{KafkaStreams, KeyValue, StreamsConfig}
 import scala.collection.JavaConversions._
@@ -18,7 +21,6 @@ object KafkaStreamsMap extends App {
   run(SampleJoinConfig)
 
   def run(config: JoinConfig) = {
-    val appStartTime = System.currentTimeMillis()
     val builder: KStreamBuilder = new KStreamBuilder
 
     val streamingConfig = {
@@ -29,7 +31,7 @@ object KafkaStreamsMap extends App {
       settings.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092")
       settings.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, "localhost:2181")
       settings.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
-      settings.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, "6")
+      settings.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, "4")
       settings.put("schema.registry.url", "http://localhost:18081")
       // Specify default (de)serializers for record keys and for record values.
       settings
@@ -49,6 +51,7 @@ object KafkaStreamsMap extends App {
       (value1: GenericRecord, value2: GenericRecord) => config.mergeRecords(value1, value2)
     var startTime: Long = 0
     var prevTime: Long = 0
+    var appStartTime: Long = 0
     facts.leftJoin(dimension, joiner)
       .mapValues { x =>
         val c = counter.incrementAndGet()
@@ -62,16 +65,16 @@ object KafkaStreamsMap extends App {
           val messagesPsCur = 1000d / (current - prevTime) * 1000
           val messagesPsOverhead = c.toDouble / (current - appStartTime) * 1000
           prevTime = current
-          println(s"Processed $c records")
-          println(f"M/ps: $messagesPsCur%2.2f ($messagesPsAvg%2.2f avg), with app start overhead - $messagesPsOverhead%2.2f")
+          println(f"M/ps: $messagesPsCur%2.2f ($messagesPsAvg%2.2f avg), with app start overhead - $messagesPsOverhead%2.2f, Total: $c%d")
         }
         x
       }
       .to(Serdes.String(), GenericAvroSerde.generic(client), config.outputTo)
     val streams = new KafkaStreams(builder, streamingConfig)
+    scala.io.StdIn.readLine("Press [ENTER] when ready to start")
+    appStartTime = System.currentTimeMillis()
     streams.start()
   }
-
 }
 
 object KeyValueImplicits {

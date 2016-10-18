@@ -17,7 +17,8 @@ lazy val core = project
   .settings(
     libraryDependencies ++= Seq(
       "org.apache.avro" % "avro" % "1.8.1",
-      "io.confluent" % "kafka-avro-serializer" % "3.0.1"
+      "io.confluent" % "kafka-avro-serializer" % "3.0.1",
+      "com.fasterxml.jackson.core" % "jackson-databind" % "2.6.5"
     )
   )
 lazy val spark = project

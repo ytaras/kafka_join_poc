@@ -22,8 +22,8 @@ object DumpKafkaTopic extends App {
     "key.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
     "value.deserializer" -> "io.confluent.kafka.serializers.KafkaAvroDeserializer",
     "group.id" -> "spark-dump-to-csv",
-    // "auto.offset.reset" -> "earliest",
-    "auto.offset.reset" -> "latest",
+    "auto.offset.reset" -> "earliest",
+//    "auto.offset.reset" -> "latest",
     "enable.auto.commit" -> (false: java.lang.Boolean)
   )
 
