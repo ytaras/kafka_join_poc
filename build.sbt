@@ -42,6 +42,18 @@ lazy val kafka = project
       "org.apache.kafka" % "kafka-clients" % "0.10.0.1",
       "org.apache.kafka" % "kafka-streams" % "0.10.0.1"
     )
+  )
 
+lazy val flink = project
+  .dependsOn(core)
+  .settings(commonSettings: _*)
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.apache.flink" %% "flink-streaming-scala" % "1.1.3",
+      "org.apache.flink" %% "flink-scala" % "1.1.3",
+      "org.apache.flink" %% "flink-clients" % "1.1.3",
+      "org.apache.flink" %% "flink-connector-kafka-0.9" % "1.1.3",
+      "org.apache.flink" %% "flink-connector-wikiedits" % "1.1.3"
+    )
   )
 

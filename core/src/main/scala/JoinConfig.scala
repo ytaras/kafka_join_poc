@@ -7,7 +7,7 @@ import scala.collection.JavaConversions._
 /**
   * Created by ytaras on 10/17/16.
   */
-trait JoinConfig {
+trait JoinConfig extends Serializable {
   def factStream: String
   def dimensionStream: String
   def joinKey: String
