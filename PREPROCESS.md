@@ -9,19 +9,21 @@ Preprocessing is packaged as a Spark Job.
  registry default port is 8081, but latest version of code looks at 
  You have either to change port in code or in schema registry properties
 3. Create topics
+
 ```
     dim_part_8
     fact_part_8
     fact_part_8_key_by_join_key
     merged_output
 ``` 
-3. Install sbt and run `sbt compile` or install IntelliJ and import project
+
+4. Install sbt and run `sbt compile` or install IntelliJ and import project
 
 ### Running
 
 1. Run `PrepareDataset` main class with single argument - name of directory 
 which contains perf_dump.txt. It doesn't terminate itself, you have to
-monitor progress at http://localhost:4040
+monitor progress at <http://localhost:4040>
 2. Run `PublishData` with same argument.
 
 Now your data is in Kafka topics
