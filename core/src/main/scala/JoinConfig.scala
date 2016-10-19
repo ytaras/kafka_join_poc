@@ -16,6 +16,7 @@ trait JoinConfig extends Serializable {
   def factSchema: Schema
   def dimSchema: Schema
   lazy val mergedSchema: Schema = {
+    println("Constructing schema")
     val fields = (factSchema.getFields ++ dimSchema.getFields).groupBy(_.name())
       .map { case (_, v) => v.head }.map { f =>
       new Schema.Field(f.name(), f.schema, f.doc(), f.defaultVal())

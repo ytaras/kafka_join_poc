@@ -1,8 +1,11 @@
+import java.io.ByteArrayOutputStream
 import java.util.Properties
 
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, SchemaRegistryClient}
 import io.confluent.kafka.serializers.KafkaAvroDeserializer
-import org.apache.avro.generic.GenericRecord
+import org.apache.avro.Schema
+import org.apache.avro.generic.{GenericDatumWriter, GenericRecord}
+import org.apache.avro.io.EncoderFactory
 import org.apache.flink.api.common.state.{ListState, ListStateDescriptor, ValueState, ValueStateDescriptor}
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala._
@@ -10,8 +13,8 @@ import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction
 import org.apache.flink.streaming.api.scala.extensions._
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
-import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer09
-import org.apache.flink.streaming.util.serialization.{DeserializationSchema, KeyedDeserializationSchema}
+import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer09, FlinkKafkaProducer09}
+import org.apache.flink.streaming.util.serialization.{DeserializationSchema, KeyedDeserializationSchema, SerializationSchema}
 import org.apache.flink.util.Collector
 
 /**
@@ -45,7 +48,7 @@ object FlinkJoin extends App {
     fact.keyingBy(_.get(jc.joinKey).toString)
       .connect(dimension.keyingBy(_._1))
       .flatMap(joinMapper)
-      .print()
+      .addSink(new FlinkKafkaProducer09[GenericRecord]("localhost:9092", jc.outputTo, new AvroSchema(jc.outputTo)))
 
     env.execute("Print")
   }
@@ -66,9 +69,13 @@ class AvroSchemaKeyed(topic: String) extends KeyedDeserializationSchema[(String,
 
 }
 
-class AvroSchema(topic: String) extends DeserializationSchema[GenericRecord] {
-  lazy val schemaRegistryClient: SchemaRegistryClient = new CachedSchemaRegistryClient("http://localhost:18081", 20)
+class AvroSchema(topic: String) extends DeserializationSchema[GenericRecord] with SerializationSchema[GenericRecord] {
+  lazy val schemaRegistryClient: SchemaRegistryClient = new CachedSchemaRegistryClient("http://localhost:18081", 25)
   lazy val deserializer = new KafkaAvroDeserializer(schemaRegistryClient)
+  lazy val datumWriter = {
+    val schema = Schema.parse(schemaRegistryClient.getLatestSchemaMetadata(s"$topic-value").getSchema)
+    new GenericDatumWriter[GenericRecord](schema)
+  }
   override def isEndOfStream(nextElement: GenericRecord): Boolean = false
 
   override def deserialize(message: Array[Byte]): GenericRecord = {
@@ -77,12 +84,22 @@ class AvroSchema(topic: String) extends DeserializationSchema[GenericRecord] {
 
   override def getProducedType: TypeInformation[GenericRecord] =
     implicitly[TypeInformation[GenericRecord]]
+
+  override def serialize(element: GenericRecord): Array[Byte] =  {
+    // FIXME - Due to serializaiton, confluent client doens't work well
+    val baos = new ByteArrayOutputStream()
+    val encoder = EncoderFactory.get().binaryEncoder(baos, null)
+    datumWriter.write(element, encoder)
+    encoder.flush()
+    baos.close()
+    baos.toByteArray
+  }
 }
 
-class JoinMapper[Fact: TypeInformation, Dim: TypeInformation, Joined]
+class JoinMapper[Fact, Dim, Joined]
 (
   merge: (Fact, Dim) => Joined
-) extends
+)(implicit ft: TypeInformation[Fact], dt: TypeInformation[Dim]) extends
   RichCoFlatMapFunction[Fact, Dim, Joined] {
 
   private var state: ValueState[Dim] = _
@@ -111,13 +128,13 @@ class JoinMapper[Fact: TypeInformation, Dim: TypeInformation, Joined]
   override def open(parameters: Configuration): Unit = {
     state = getRuntimeContext.getState(new ValueStateDescriptor[Dim](
       "dimension",
-      implicitly[TypeInformation[Dim]],
+      dt,
       null.asInstanceOf[Dim]
     ))
 
     buffer = getRuntimeContext.getListState[Fact](new ListStateDescriptor[Fact](
       "fact_buffer",
-      implicitly[TypeInformation[Fact]]
+      ft
     ))
   }
 }

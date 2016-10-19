@@ -1,0 +1,3 @@
+metrics.reporters: my_jmx_reporter
+
+metrics.reporter.my_jmx_reporter.class: org.apache.flink.metrics.jmx.JMXReporter
